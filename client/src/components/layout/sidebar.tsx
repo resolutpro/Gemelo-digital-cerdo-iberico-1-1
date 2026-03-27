@@ -15,6 +15,7 @@ import {
   QrCode,
   Menu,
   ChevronLeft,
+  BrainCircuit,
 } from "lucide-react";
 import {
   Tooltip,
@@ -36,6 +37,7 @@ const navigationItems = [
   { icon: Truck, label: "Logística y Distribución", href: "/distribucion" },
   { icon: Route, label: "Blockchain Tracker", href: "/seguimiento" },
   { icon: QrCode, label: "Generador QR", href: "/trazabilidad" },
+  { icon: BrainCircuit, label: "IA y Analítica", href: "/ia-analitica" },
 ];
 
 export function Sidebar({ className }: SidebarProps) {

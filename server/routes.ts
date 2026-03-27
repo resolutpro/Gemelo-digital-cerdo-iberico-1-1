@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { mqttService } from "./mqtt-service";
+import { mlEngine } from "./ml-engine";
 
 // Simple logger for diagnostics
 const logger = {
@@ -127,9 +128,10 @@ async function generateSnapshotData(loteId: string, organizationId: string) {
     try {
       // For sublotes, use the parent lote ID for sensor data in pre-secadero stages
       // since the sensors were recording for the parent lote before division
-      const loteIdForSensorData = isSubLote && ["cria", "engorde", "matadero"].includes(stage) 
-        ? lote.parentLoteId 
-        : loteId;
+      const loteIdForSensorData =
+        isSubLote && ["cria", "engorde", "matadero"].includes(stage)
+          ? lote.parentLoteId
+          : loteId;
 
       sensorData = await storage.getSensorDataByLoteAndStage(
         loteIdForSensorData,
@@ -137,24 +139,29 @@ async function generateSnapshotData(loteId: string, organizationId: string) {
         new Date(startTime),
         new Date(endTime),
       );
-      console.log(`Retrieved ${sensorData.length} sensor readings for lote ${loteIdForSensorData} (original: ${loteId}), stage ${stage}`);
+      console.log(
+        `Retrieved ${sensorData.length} sensor readings for lote ${loteIdForSensorData} (original: ${loteId}), stage ${stage}`,
+      );
     } catch (error) {
       console.error(`Error fetching sensor data for phase ${stage}:`, error);
-      console.error('Error stack:', error.stack);
+      console.error("Error stack:", error.stack);
     }
 
     // Calculate metrics
     const metrics: Record<string, any> = {};
     if (sensorData && sensorData.length > 0) {
       // Group by sensor type
-      const sensorGroups = sensorData.reduce((acc, reading) => {
-        const type = reading.sensorType || 'unknown';
-        if (!acc[type]) acc[type] = [];
-        if (reading.value != null && !isNaN(Number(reading.value))) {
-          acc[type].push(Number(reading.value));
-        }
-        return acc;
-      }, {} as Record<string, number[]>);
+      const sensorGroups = sensorData.reduce(
+        (acc, reading) => {
+          const type = reading.sensorType || "unknown";
+          if (!acc[type]) acc[type] = [];
+          if (reading.value != null && !isNaN(Number(reading.value))) {
+            acc[type].push(Number(reading.value));
+          }
+          return acc;
+        },
+        {} as Record<string, number[]>,
+      );
 
       // Calculate statistics for each sensor type
       Object.entries(sensorGroups).forEach(([type, values]) => {
@@ -172,7 +179,9 @@ async function generateSnapshotData(loteId: string, organizationId: string) {
           const target = targetRanges[type as keyof typeof targetRanges];
           let pctInTarget;
           if (target) {
-            const inTarget = values.filter(v => v >= target.min && v <= target.max).length;
+            const inTarget = values.filter(
+              (v) => v >= target.min && v <= target.max,
+            ).length;
             pctInTarget = Math.round((inTarget / values.length) * 100);
           }
 
@@ -406,15 +415,19 @@ export function registerRoutes(app: Express): Server {
 
       // Generate URL: use replit.app for deployment, replit.dev for development
       const getPublicUrl = (token: string) => {
-        const host = req.get('host');
+        const host = req.get("host");
 
         // Check if we're in deployment (production) by checking the host domain
-        if (host && host.includes('.replit.app')) {
+        if (host && host.includes(".replit.app")) {
           // Already in deployment, use the current host
           return `https://${host}/zona-movimiento/${token}`;
-        } else if (host && host.includes('.replit.dev') && process.env.NODE_ENV === 'production') {
+        } else if (
+          host &&
+          host.includes(".replit.dev") &&
+          process.env.NODE_ENV === "production"
+        ) {
           // In deployment but still showing .dev domain, replace with .app
-          const deployHost = host.replace('.replit.dev', '.replit.app');
+          const deployHost = host.replace(".replit.dev", ".replit.app");
           return `https://${deployHost}/zona-movimiento/${token}`;
         }
 
@@ -577,11 +590,9 @@ export function registerRoutes(app: Express): Server {
       59,
     );
     if (entryDate > endOfToday) {
-      return res
-        .status(400)
-        .json({
-          message: "La fecha de entrada no puede ser posterior al día de hoy",
-        });
+      return res.status(400).json({
+        message: "La fecha de entrada no puede ser posterior al día de hoy",
+      });
     }
 
     const currentStay = await storage.getActiveStayByLote(loteId);
@@ -795,15 +806,19 @@ export function registerRoutes(app: Express): Server {
         ...zone,
         qrToken: publicToken,
         qrUrl: (() => {
-          const host = req.get('host');
+          const host = req.get("host");
 
           // Check if we're in deployment (production) by checking the host domain
-          if (host && host.includes('.replit.app')) {
+          if (host && host.includes(".replit.app")) {
             // Already in deployment, use the current host
             return `https://${host}/zona-movimiento/${publicToken}`;
-          } else if (host && host.includes('.replit.dev') && process.env.NODE_ENV === 'production') {
+          } else if (
+            host &&
+            host.includes(".replit.dev") &&
+            process.env.NODE_ENV === "production"
+          ) {
             // In deployment but still showing .dev domain, replace with .app
-            const deployHost = host.replace('.replit.dev', '.replit.app');
+            const deployHost = host.replace(".replit.dev", ".replit.app");
             return `https://${deployHost}/zona-movimiento/${publicToken}`;
           }
 
@@ -859,11 +874,9 @@ export function registerRoutes(app: Express): Server {
           zoneId: req.params.id,
           reason: "active_stays",
         });
-        return res
-          .status(400)
-          .json({
-            message: "No se puede eliminar la zona (tiene estancias activas)",
-          });
+        return res.status(400).json({
+          message: "No se puede eliminar la zona (tiene estancias activas)",
+        });
       }
 
       await storage.createAuditLog({
@@ -983,7 +996,10 @@ export function registerRoutes(app: Express): Server {
       });
 
       // Update the sensor's MQTT configuration
-      const updatedSensor = await storage.updateSensorMqttConfig(req.params.id, mqttConfig);
+      const updatedSensor = await storage.updateSensorMqttConfig(
+        req.params.id,
+        mqttConfig,
+      );
 
       if (!updatedSensor) {
         return res.status(404).json({ message: "Sensor no encontrado" });
@@ -996,9 +1012,9 @@ export function registerRoutes(app: Express): Server {
       });
       await mqttService.forceRefresh();
 
-      res.json({ 
+      res.json({
         message: "Configuración MQTT actualizada correctamente",
-        sensor: updatedSensor 
+        sensor: updatedSensor,
       });
     }),
   );
@@ -1035,7 +1051,7 @@ export function registerRoutes(app: Express): Server {
           port: mqttConfig.mqttPort,
           username: mqttConfig.mqttUsername,
           password: mqttConfig.mqttPassword,
-          protocol: 'mqtts' as 'mqtts', // Use secure MQTT for TTN
+          protocol: "mqtts" as "mqtts", // Use secure MQTT for TTN
           connectTimeout: 10000, // 10 second timeout
         };
 
@@ -1045,10 +1061,14 @@ export function registerRoutes(app: Express): Server {
         const testPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             client.end();
-            reject(new Error("Timeout de conexión - no se pudo conectar en 10 segundos"));
+            reject(
+              new Error(
+                "Timeout de conexión - no se pudo conectar en 10 segundos",
+              ),
+            );
           }, 10000);
 
-          client.on('connect', () => {
+          client.on("connect", () => {
             clearTimeout(timeout);
             logger.info("MQTT connection test successful", {
               sensorId: req.params.id,
@@ -1059,7 +1079,7 @@ export function registerRoutes(app: Express): Server {
             resolve({ success: true, message: "Conexión MQTT exitosa" });
           });
 
-          client.on('error', (error) => {
+          client.on("error", (error) => {
             clearTimeout(timeout);
             logger.error("MQTT connection test failed", error);
             client.end();
@@ -1071,9 +1091,9 @@ export function registerRoutes(app: Express): Server {
         res.json(result);
       } catch (error: any) {
         logger.error("MQTT test connection error", error);
-        res.status(400).json({ 
-          message: "Error al probar conexión MQTT", 
-          error: error.message 
+        res.status(400).json({
+          message: "Error al probar conexión MQTT",
+          error: error.message,
         });
       }
     }),
@@ -1128,7 +1148,9 @@ export function registerRoutes(app: Express): Server {
       if (!zone)
         return res.status(404).json({ message: "Sensor no encontrado" });
 
-      const latestReading = await storage.getLatestReadingBySensor(req.params.id);
+      const latestReading = await storage.getLatestReadingBySensor(
+        req.params.id,
+      );
       res.json(latestReading || null);
     }),
   );
@@ -1283,12 +1305,18 @@ export function registerRoutes(app: Express): Server {
       for (const lote of activeLotes) {
         const activeStay = await storage.getActiveStayByLote(lote.id);
         if (activeStay && activeStay.zoneId) {
-          const zone = await storage.getZone(activeStay.zoneId, req.organizationId);
+          const zone = await storage.getZone(
+            activeStay.zoneId,
+            req.organizationId,
+          );
           if (zone) {
             const extendedLote = {
               ...lote,
               currentZone: zone,
-              totalDays: Math.floor((Date.now() - activeStay.entryTime.getTime()) / (1000 * 60 * 60 * 24))
+              totalDays: Math.floor(
+                (Date.now() - activeStay.entryTime.getTime()) /
+                  (1000 * 60 * 60 * 24),
+              ),
             };
 
             if (zone.stage in board) {
@@ -1300,7 +1328,7 @@ export function registerRoutes(app: Express): Server {
           board.sinUbicacion.lotes.push({
             ...lote,
             currentZone: null,
-            totalDays: 0
+            totalDays: 0,
           });
         }
       }
@@ -1310,7 +1338,7 @@ export function registerRoutes(app: Express): Server {
         board.finalizado.lotes.push({
           ...lote,
           currentZone: null,
-          totalDays: 0
+          totalDays: 0,
         });
       }
 
@@ -1325,12 +1353,30 @@ export function registerRoutes(app: Express): Server {
       };
 
       const animalCounts = {
-        cria: board.cria.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
-        engorde: board.engorde.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
-        matadero: board.matadero.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
-        secadero: board.secadero.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
-        distribucion: board.distribucion.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
-        unassigned: board.sinUbicacion.lotes.reduce((sum: number, l: any) => sum + l.initialAnimals, 0),
+        cria: board.cria.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
+        engorde: board.engorde.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
+        matadero: board.matadero.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
+        secadero: board.secadero.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
+        distribucion: board.distribucion.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
+        unassigned: board.sinUbicacion.lotes.reduce(
+          (sum: number, l: any) => sum + l.initialAnimals,
+          0,
+        ),
       };
 
       let totalAnimals = 0;
@@ -1798,6 +1844,51 @@ export function registerRoutes(app: Express): Server {
     }),
   );
 
+  // --- RUTAS DE INTELIGENCIA ARTIFICIAL Y MACHINE LEARNING ---
+  app.post("/api/ml/predict-lote", async (req, res) => {
+    try {
+      // 1. Extraer los features (características) del lote solicitadas por el cliente
+      const { loteId } = req.body;
+
+      // NOTA FUTURA: Aquí harías consultas a la BD para obtener días exactos en zonas,
+      // temperatura media de los sensores, etc. asociados a este loteId.
+
+      // Simulamos la extracción de features para el lote actual:
+      const features = {
+        daysInCria: 45,
+        daysInEngorde: 90,
+        avgTempSecadero: 23.5, // Podrías sacarlo haciendo un AVG() de sensor_readings
+        avgHumiditySecadero: 65,
+        initialAnimals: 50,
+      };
+
+      // 2. Pedir al motor de ML que haga la predicción
+      const prediction = await mlEngine.predictLoteYield(features);
+
+      res.json({
+        loteId,
+        featuresExtraidas: features,
+        prediccion: prediction,
+      });
+    } catch (error) {
+      console.error("Error en predicción ML:", error);
+      res.status(500).json({ error: "Error interno en el motor de IA" });
+    }
+  });
+
+  app.post("/api/ml/analyze-anomaly", async (req, res) => {
+    const { currentValue, sensorId } = req.body;
+
+    // NOTA FUTURA: Sacarías el array de las últimas 50 lecturas de sensor_readings
+    const historicalDummyValues = [22.1, 22.3, 22.0, 22.4, 22.2, 22.1];
+
+    const analysis = mlEngine.detectSensorAnomaly(
+      currentValue,
+      historicalDummyValues,
+      "temperatura",
+    );
+    res.json(analysis);
+  });
   const httpServer = createServer(app);
   return httpServer;
 }
