@@ -90,3 +90,15 @@ Preferred communication style: Simple, everyday language.
 - **express-session**: Session middleware for Express
 - **connect-pg-simple**: PostgreSQL session store
 - **memorystore**: In-memory session store fallback for development
+
+## Blockchain
+npx hardhat compile (La Traducción): Has cogido el código humano que escribimos en Solidity (IbericoTraceability.sol) y lo has traducido a "Bytecode" (el idioma que entiende la máquina virtual de la blockchain). Además, esto generó el ABI (Application Binary Interface), que es básicamente el "manual de instrucciones" que tu servidor Node.js necesita para saber qué funciones tiene el contrato y cómo llamarlas.
+
+npx hardhat run scripts/deploy.cjs... (El Lanzamiento):
+Has cogido ese código compilado y lo has subido de forma permanente a tu blockchain local (la que está corriendo en la Terminal 1).
+
+npx hardhat node
+npx hardhat run scripts/deploy.cjs --network localhost
+Te saldrá el mensaje: ¡Éxito! IbericoTraceability desplegado en la dirección: 0x...
+
+Copia esa dirección y pégala en tu .env en la variable CONTRACT_ADDRESS.

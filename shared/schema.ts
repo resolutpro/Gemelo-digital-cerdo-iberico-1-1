@@ -65,6 +65,7 @@ export const lotes = pgTable("lotes", {
   status: text("status").notNull().default("active"), // active, finished
   parentLoteId: uuid("parent_lote_id"), // for sublotes
   pieceType: text("piece_type"), // for sublotes: jamón, paleta, etc.
+  blockchainTxHash: text("blockchain_tx_hash"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -203,6 +204,8 @@ export const qrSnapshots = pgTable("qr_snapshots", {
     .notNull(),
   scanCount: integer("scan_count").default(0),
   isActive: boolean("is_active").default(true),
+  blockchainTxHash: text("blockchain_tx_hash"), // Tx final de certificación
+  blockchainExplorerUrl: text("blockchain_explorer_url"), // URL para el consumidor
   createdBy: uuid("created_by")
     .references(() => users.id)
     .notNull(),

@@ -54,9 +54,11 @@
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",
+    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
+    "ethers": "^6.16.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
@@ -86,6 +88,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "@replit/vite-plugin-cartographer": "^0.3.0",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
@@ -103,6 +106,7 @@
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.30.6",
     "esbuild": "^0.25.12",
+    "hardhat": "^2.28.6",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",

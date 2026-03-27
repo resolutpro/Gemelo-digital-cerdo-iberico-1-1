@@ -17,6 +17,8 @@ import {
 import { randomUUID } from "crypto";
 import { mqttService } from "./mqtt-service";
 import { mlEngine } from "./ml-engine";
+import { blockchainService } from "./blockchain-service";
+import crypto from "crypto";
 
 // Simple logger for diagnostics
 const logger = {
@@ -309,6 +311,20 @@ export function registerRoutes(app: Express): Server {
         payload: loteWithStatus,
       });
       const lote = await storage.createLote(loteWithStatus);
+
+      const txHash = await blockchainService.registerLoteOnChain(
+        lote.id,
+        lote.identification,
+        lote.initialAnimals,
+      );
+      if (txHash) {
+        await storage.updateLote(
+          lote.id,
+          { blockchainTxHash: txHash },
+          req.organizationId,
+        );
+      }
+
       logger.info("Lote created", { loteId: lote.id, status: lote.status });
       res.status(201).json(lote);
     }),
@@ -1607,20 +1623,56 @@ export function registerRoutes(app: Express): Server {
           ? await storage.getZone(zoneId, req.organizationId)
           : null;
       if (generateQR && targetZoneFinal?.stage === "distribucion") {
+        // 1. Obtener métricas consolidadas (IoT)
         const snapshotData = await generateSnapshotData(
           lote.id,
           req.organizationId,
         );
+
+        // 2. Integración de IA/ML: Evaluar rendimiento/calidad antes de certificar
+        const featuresForML = {
+          daysInCria:
+            snapshotData.phases.find((p) => p.stage === "cria")?.duration || 0,
+          daysInEngorde:
+            snapshotData.phases.find((p) => p.stage === "engorde")?.duration ||
+            0,
+          avgTempSecadero:
+            snapshotData.phases.find((p) => p.stage === "secadero")?.metrics
+              ?.temperature?.avg || 20,
+          initialAnimals: lote.initialAnimals,
+        };
+        const mlPrediction = await mlEngine.predictLoteYield(featuresForML);
+
+        // Añadir el sello de IA al snapshot
+        snapshotData.metadata.aiQualityPrediction = mlPrediction;
+
+        // 3. Registrar inmutabilidad y ejecutar Smart Contract (Blockchain)
+        const currentStayForBC = await storage.getActiveStayByLote(lote.id); // La estancia que acaba de cerrar
+        const bcTxHash = await blockchainService.certifyStageOnChain(
+          lote.id,
+          "secadero", // Estamos certificando la fase que termina antes de distribuir
+          currentStayForBC ? currentStayForBC.entryTime.getTime() : Date.now(),
+          Date.now(),
+          snapshotData,
+          7500, // Aquí conectarías la lectura del sensor IoT de la báscula
+        );
+
+        // 4. Generar QR vinculando todo el ecosistema
         qrSnapshot = await storage.createQrSnapshot({
           loteId: lote.id,
           publicToken: randomUUID(),
           snapshotData,
+          blockchainTxHash: bcTxHash, // Guardamos la firma del contrato
+          blockchainExplorerUrl: bcTxHash
+            ? `https://amoy.polygonscan.com/tx/${bcTxHash}`
+            : null,
           createdBy: req.user.id,
         });
-        logger.info("QR snapshot created", {
+
+        logger.info("QR snapshot and Blockchain TX created", {
           loteId: lote.id,
           snapshotId: qrSnapshot.id,
-          token: qrSnapshot.publicToken,
+          txHash: bcTxHash,
         });
       }
 
@@ -1750,7 +1802,14 @@ export function registerRoutes(app: Express): Server {
           .status(404)
           .json({ message: "Código QR no válido o revocado" });
       await storage.incrementScanCount(req.params.token);
-      res.json(snapshot.snapshotData);
+
+      const responseData = {
+        ...snapshot.snapshotData,
+        blockchainTxHash: snapshot.blockchainTxHash,
+        blockchainExplorerUrl: snapshot.blockchainExplorerUrl,
+      };
+
+      res.json(responseData);
     }),
   );
 
